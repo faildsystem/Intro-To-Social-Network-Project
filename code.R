@@ -35,16 +35,14 @@ read_edges <- function(path) {
 
 # Read edges from all data files
 
-data_path <- "facebook_clean_data/"
-
-public <- read_edges(paste0(data_path, "public_figure_edges.csv"))
-tv <- read_edges(paste0(data_path, "tvshow_edges.csv"))
-pol <- read_edges(paste0(data_path, "politician_edges.csv"))
-artist <- read_edges(paste0(data_path, "artist_edges.csv"))
-athlete <- read_edges(paste0(data_path, "athletes_edges.csv"))
-company <- read_edges(paste0(data_path, "company_edges.csv"))
-site <- read_edges(paste0(data_path, "new_sites_edges.csv"))
-gov <- read_edges(paste0(data_path, "government_edges.csv"))
+public <- read_edges("facebook_clean_data/public_figure_edges.csv")
+tv <- read_edges("facebook_clean_data/tvshow_edges.csv")
+pol <- read_edges("facebook_clean_data/politician_edges.csv")
+artist <- read_edges("facebook_clean_data/artist_edges.csv")
+athlete <- read_edges("facebook_clean_data/athletes_edges.csv")
+company <- read_edges("facebook_clean_data/company_edges.csv")
+site <- read_edges("facebook_clean_data/new_sites_edges.csv")
+gov <- read_edges("facebook_clean_data/government_edges.csv")
 
 # Combine all datasets
 
@@ -57,7 +55,6 @@ all_edges <- bind_rows(
   company = company,
   news_site = site,
   government = gov,
-  .id = "source"
 )
 
 # Print the first few rows to verify
@@ -68,8 +65,3 @@ head(all_edges)
 # Export the merged dataset to a CSV file
 
 write.csv(all_edges, "merged_edges.csv", row.names = FALSE)
-
-
-
-
-
