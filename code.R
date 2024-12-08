@@ -103,7 +103,7 @@ calculate_metrics <- function(edges) {
   list(metrics = metrics, longest_shortest_path = graph_diameter, avg_clustering_coef = avg_clustering_coef)
 }
 
-results <- calculate_metrics(edges_df[1:1000, ])
+results <- calculate_metrics(edges_df)
 
 # Extract metrics and longest shortest path
 graph_metrics <- results$metrics
