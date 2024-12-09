@@ -11,7 +11,8 @@
 #   "ff",
 #   "dplyr",
 #   "visNetwork",
-#   "webshot"
+#   "webshot",
+#   "linkcomm"
 # )
 # # Loop to install packages if they are not already installed
 # 
@@ -24,25 +25,10 @@
 #     library(package, character.only = TRUE)
 #   }
 # }
-# 
+
 # 
 # webshot::install_phantomjs()
 
-
-# Load required packages
-library(shiny)
-library(shinycssloaders)
-library(igraph)
-library(tidyverse)
-library(ggplot2)
-library(reshape2)
-library(rgl)
-library(plotly)
-library(ff)
-library(dplyr)
-library(visNetwork)
-library(webshot)
-library(linkcomm)  
 
 # Increase file upload size to 50 MB
 options(shiny.maxRequestSize = 50 * 1024^2)
@@ -109,7 +95,7 @@ ui <- fluidPage(
                  uiOutput("nodeSelectorPath"),
                  actionButton("calculatePath", "Calculate Path Between Nodes"),
                  textOutput("pathResult"),
-                 withSpinner(tableOutput("pathDetails"), type = 7, color = "#0d6efd")
+                 tableOutput("pathDetails")
         ),
         tabPanel("Node Metrics",
                  uiOutput("nodeSelector"),
@@ -121,6 +107,7 @@ ui <- fluidPage(
   )
 )
 
+# Server definition
 # Server definition
 server <- function(input, output, session) {
   
@@ -191,7 +178,7 @@ server <- function(input, output, session) {
     # Perform calculations
     results(calculate_metrics(edges(), input$graphType, input$normalized))
     
-    #  loading message
+    # loading message
     removeModal()
     
     # Update node selector for path analysis
@@ -348,6 +335,7 @@ output$communityPlot <- renderPlotly({
     req(results())
     results()$metrics
   })
+
   
   # Output graph info
   output$nodesCount <- renderText({
@@ -360,7 +348,7 @@ output$communityPlot <- renderPlotly({
     paste("Graph Edges Number:", results()$edges)
   })
   
-  # Output the min degree
+  # Output the connected status
   output$connected <- renderText({
     req(results())
     paste("Connected:", results()$connected)
@@ -394,15 +382,6 @@ output$communityPlot <- renderPlotly({
     paste("Average Clustering Coefficient:", round(results()$avg_clustering, 3))
   })
   
-  # Enable download of metrics
-  output$downloadMetrics <- downloadHandler(
-    filename = function() { "graph_metrics.csv" },
-    content = function(file) {
-      req(results())
-      write.csv(results()$metrics, file, row.names = FALSE)
-    }
-  )
-  
   # Output adjacency matrix
   output$adjMatrix <- renderTable({
     req(results())
@@ -433,7 +412,6 @@ output$communityPlot <- renderPlotly({
       visEdges(smooth = TRUE) %>%
       visLayout(randomSeed = 42)
   })
-  
   
   output$degreeDistPlot <- renderPlotly({
     req(results())
