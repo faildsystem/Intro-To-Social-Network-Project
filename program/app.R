@@ -11,7 +11,8 @@
 #   "ff",
 #   "dplyr",
 #   "visNetwork",
-#   "webshot"
+#   "webshot",
+#   "linkcomm"
 # )
 # # Loop to install packages if they are not already installed
 # 
@@ -24,25 +25,10 @@
 #     library(package, character.only = TRUE)
 #   }
 # }
-# 
+
 # 
 # webshot::install_phantomjs()
 
-
-# Load required packages
-library(shiny)
-library(shinycssloaders)
-library(igraph)
-library(tidyverse)
-library(ggplot2)
-library(reshape2)
-library(rgl)
-library(plotly)
-library(ff)
-library(dplyr)
-library(visNetwork)
-library(webshot)
-library(linkcomm)  
 
 # Increase file upload size to 50 MB
 options(shiny.maxRequestSize = 50 * 1024^2)
@@ -109,7 +95,7 @@ ui <- fluidPage(
                  uiOutput("nodeSelectorPath"),
                  actionButton("calculatePath", "Calculate Path Between Nodes"),
                  textOutput("pathResult"),
-                 withSpinner(tableOutput("pathDetails"), type = 7, color = "#0d6efd")
+                 tableOutput("pathDetails")
         ),
         tabPanel("Node Metrics",
                  uiOutput("nodeSelector"),
@@ -152,7 +138,7 @@ server <- function(input, output, session) {
         degree_centrality = degree(g, mode = "all", normalized = isNormalized),
         betweenness_centrality = betweenness(g, directed = (directed == "directed"), normalized = isNormalized),
         closeness_centrality = closeness(g, normalized = isNormalized),
-        eigenvector_centrality = evcent(g)$vector,
+        eigenvector_centrality = eigen_centrality(g)$vector,
         page_rank = page_rank(g)$vector,
         local_clustering_coefficient = transitivity(g, type = "local", isolates = "zero")
       ) %>% 
@@ -294,6 +280,7 @@ server <- function(input, output, session) {
       write.csv(results()$community_metrics, file, row.names = FALSE)
     }
   )
+  
   # Function for calculating metrics for a specific node
   calculate_node_metrics <- function(node_name) {
     # Get the graph from results
@@ -301,17 +288,8 @@ server <- function(input, output, session) {
     
     # Find the node index from node name
     node <- match(node_name, V(g)$name)
-    if (is.na(node)) {
-      return(data.frame(Error = "Node not found"))
-    }
-    
-    # Calculate the centrality metrics for the entire graph
-    degree_centrality <- degree(g, mode = "all", normalized = input$normalized)[node]
-    betweenness_centrality <- betweenness(g, directed = (input$graphType == "directed"), normalized = input$normalized)[node]
-    closeness_centrality <- closeness(g, normalized = input$normalized)[node]
-    eigenvector_centrality <- evcent(g)$vector[node]
-    page_rank <- page_rank(g)$vector[node]
-    local_clustering_coefficient <- transitivity(g, type = "local", isolates = "zero")[node]
+
+    node_metrics <- results()$centrality_metrics[node, ]
     
     # Get the neighbors of the node
     neighbors <- neighbors(g, node)
@@ -319,17 +297,7 @@ server <- function(input, output, session) {
     # Retrieve the names of the neighbors
     neighbor_names <- V(g)[neighbors]$name
     
-    # Create a data frame with the node metrics
-    node_metrics <- data.frame(
-      Node = node_name,
-      Degree_Centrality = degree_centrality,
-      Betweenness_Centrality = betweenness_centrality,
-      Closeness_Centrality = closeness_centrality,
-      Eigenvector_Centrality = eigenvector_centrality,
-      Page_Rank = page_rank,
-      Local_Clustering_Coefficient = local_clustering_coefficient,
-      Neighbors = paste(neighbor_names, collapse = ", ")
-    )
+    node_metrics$neighbors <- paste(neighbor_names, collapse = ", ")
     
     return(node_metrics)
   }
