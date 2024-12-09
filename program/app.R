@@ -157,7 +157,7 @@ server <- function(input, output, session) {
         local_clustering_coefficient = transitivity(g, type = "local", isolates = "zero")
       ) %>% 
         mutate(across(where(is.numeric), ~round(., 4)))
-      
+     
       # Adjacency Matrix
       adjacency <- as.matrix(as_adjacency_matrix(g, sparse = FALSE))
       
@@ -304,15 +304,10 @@ server <- function(input, output, session) {
     if (is.na(node)) {
       return(data.frame(Error = "Node not found"))
     }
-    
-    # Calculate the centrality metrics for the entire graph
-    degree_centrality <- degree(g, mode = "all", normalized = input$normalized)[node]
-    betweenness_centrality <- betweenness(g, directed = (input$graphType == "directed"), normalized = input$normalized)[node]
-    closeness_centrality <- closeness(g, normalized = input$normalized)[node]
-    eigenvector_centrality <- evcent(g)$vector[node]
-    page_rank <- page_rank(g)$vector[node]
-    local_clustering_coefficient <- transitivity(g, type = "local", isolates = "zero")[node]
-    
+
+    specific_node <- results()$centrality_metrics %>%
+      filter(node == node_name)
+    print(specific_node)
     # Get the neighbors of the node
     neighbors <- neighbors(g, node)
     
@@ -321,14 +316,8 @@ server <- function(input, output, session) {
     
     # Create a data frame with the node metrics
     node_metrics <- data.frame(
-      Node = node_name,
-      Degree_Centrality = degree_centrality,
-      Betweenness_Centrality = betweenness_centrality,
-      Closeness_Centrality = closeness_centrality,
-      Eigenvector_Centrality = eigenvector_centrality,
-      Page_Rank = page_rank,
-      Local_Clustering_Coefficient = local_clustering_coefficient,
-      Neighbors = paste(neighbor_names, collapse = ", ")
+     specific_node,
+      neighbors = paste(neighbor_names, collapse = ", ")
     )
     
     return(node_metrics)
