@@ -69,6 +69,14 @@ ui <- fluidPage(
       tabsetPanel(
         tabPanel("Graph Info", 
                  br(),
+                 withSpinner(textOutput("community_det"), type = 7, color = "#0d6efd"),
+                 br(),
+                 withSpinner(textOutput("membership"), type = 7, color = "#0d6efd"),
+                 br(),
+                 withSpinner(textOutput("page_rank_value"), type = 7, color = "#0d6efd"),
+                 br(),
+                 withSpinner(textOutput("eigenvector_centrality"), type = 7, color = "#0d6efd"),
+                 br(),
                  withSpinner(textOutput("nodesCount"), type = 7, color = "#0d6efd"),
                  br(),
                  withSpinner(textOutput("edgesCount"), type = 7, color = "#0d6efd"),
@@ -155,6 +163,7 @@ server <- function(input, output, session) {
         eigenvector_centrality = evcent(g)$vector,
         page_rank = page_rank(g)$vector,
         local_clustering_coefficient = transitivity(g, type = "local", isolates = "zero")
+        
       ) %>% 
         mutate(across(where(is.numeric), ~round(., 4)))
       
@@ -180,12 +189,20 @@ server <- function(input, output, session) {
         min_degree = min(degree(g, mode = "all", normalized = isNormalized)),
         max_degree = max(degree(g, mode = "all", normalized = isNormalized)),
         avg_degree = round(mean(degree(g, mode = "all", normalized = isNormalized)), 3),
-        connected = is_connected(g),
+         connected = is_connected(g),
         nodes = vcount(g),
         edges = ecount(g),
         adjacency_matrix = adjacency,
         community_metrics = community_metrics,
         link_communities = lc
+
+
+        community_det <- cluster_walktrap(g),
+        membership <- membership(community_det)[node],
+        graph_connectivity <- vertex_connectivity(g),
+        node_connectivity <- vertex_connectivity(graph, source = node),
+        page_rank_value <- page_rank(graph)$vector[node_index],
+        eigenvector_centrality <- eigen_centrality(graph)$vector[node],
       )
     }
     
@@ -312,6 +329,13 @@ server <- function(input, output, session) {
     eigenvector_centrality <- evcent(g)$vector[node]
     page_rank <- page_rank(g)$vector[node]
     local_clustering_coefficient <- transitivity(g, type = "local", isolates = "zero")[node]
+   
+    community_det <- cluster_walktrap(g)
+    membership <- membership(community_det)[node]
+    graph_connectivity <- vertex_connectivity(g)
+    node_connectivity <- vertex_connectivity(g, source = node)
+    page_rank_value <- page_rank(g)$vector[node]
+    eigenvector_centrality <- eigen_centrality(g)$vector[node]
     
     # Get the neighbors of the node
     neighbors <- neighbors(g, node)
@@ -328,7 +352,14 @@ server <- function(input, output, session) {
       Eigenvector_Centrality = eigenvector_centrality,
       Page_Rank = page_rank,
       Local_Clustering_Coefficient = local_clustering_coefficient,
-      Neighbors = paste(neighbor_names, collapse = ", ")
+      Neighbors = Neighbors
+      
+      community_det <- community_det
+      membership <- membership
+      graph_connectivity <- graph_connectivity
+      node_connectivity <- node_connectivity
+      page_rank_value <- page_rank_value
+      eigenvector_centrality <- eigenvector_centrality
     )
     
     return(node_metrics)
@@ -399,7 +430,39 @@ server <- function(input, output, session) {
     req(results())
     paste("Average Clustering Coefficient:", round(results()$avg_clustering, 3))
   })
-  
+
+
+
+      
+  output$community_det<-renderText({
+    req(results())
+    paste("community Detection :", results()$community_det)
+    })
+
+  output$membership<-renderText({
+    req(results())
+    paste("Membership :", results()$membership)
+    })    
+
+  output$graph_connectivity<-renderText({
+    req(results())
+    paste("Graph connectivity :", results()$graph_connectivity)
+    }) 
+
+  output$node_connectivity<-render({
+    req(results())
+    paste("Node connectivity :", results()$node_connectivity)
+  })
+  output$page_rank_value<-render({
+    req(results())
+     paste("Node Rank :", results()$page_rank_value)})
+
+  output$eigenvector_centrality<-render({
+    req(reults())
+    paste("Eigen vector centerality :", results()$eigenvector_centrality)
+  }]
+
+       
   # Enable download of metrics
   output$downloadMetrics <- downloadHandler(
     filename = function() { "graph_metrics.csv" },
