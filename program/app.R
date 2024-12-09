@@ -108,6 +108,7 @@ ui <- fluidPage(
 )
 
 # Server definition
+# Server definition
 server <- function(input, output, session) {
   
   # Reactive value to store edges and results
@@ -171,14 +172,16 @@ server <- function(input, output, session) {
         edges = ecount(g),
         adjacency_matrix = adjacency,
         community_metrics = community_metrics,
-        link_communities = lc
+        link_communities = lc,
+        page_rank_values = page_rank(g)$vector,   # Store the page rank values
+        eigenvector_values = eigen_centrality(g)$vector  # Store eigenvector centrality values
       )
     }
     
     # Perform calculations
     results(calculate_metrics(edges(), input$graphType, input$normalized))
     
-    #  loading message
+    # loading message
     removeModal()
     
     # Update node selector for path analysis
@@ -281,48 +284,6 @@ server <- function(input, output, session) {
     }
   )
   
-  # Function for calculating metrics for a specific node
-  calculate_node_metrics <- function(node_name) {
-    # Get the graph from results
-    g <- results()$graph
-    
-    # Find the node index from node name
-    node <- match(node_name, V(g)$name)
-
-    node_metrics <- results()$centrality_metrics[node, ]
-    
-    # Get the neighbors of the node
-    neighbors <- neighbors(g, node)
-    
-    # Retrieve the names of the neighbors
-    neighbor_names <- V(g)[neighbors]$name
-    
-    node_metrics$neighbors <- paste(neighbor_names, collapse = ", ")
-    
-    return(node_metrics)
-  }
-  
-  
-  # Calculate node metrics when button is clicked
-  observeEvent(input$calculateNodeMetrics, {
-    req(input$nodeIndex)
-    node_metrics <- calculate_node_metrics(input$nodeIndex)
-    
-    output$nodeMetricsTable <- renderTable({
-      
-      node_metrics
-      
-    })
-  })
-  
-  
-  
-  # Output the metrics table
-  output$metricsTable <- renderTable({
-    req(results())
-    results()$metrics
-  })
-  
   # Output graph info
   output$nodesCount <- renderText({
     req(results())
@@ -334,7 +295,7 @@ server <- function(input, output, session) {
     paste("Graph Edges Number:", results()$edges)
   })
   
-  # Output the min degree
+  # Output the connected status
   output$connected <- renderText({
     req(results())
     paste("Connected:", results()$connected)
@@ -368,15 +329,6 @@ server <- function(input, output, session) {
     paste("Average Clustering Coefficient:", round(results()$avg_clustering, 3))
   })
   
-  # Enable download of metrics
-  output$downloadMetrics <- downloadHandler(
-    filename = function() { "graph_metrics.csv" },
-    content = function(file) {
-      req(results())
-      write.csv(results()$metrics, file, row.names = FALSE)
-    }
-  )
-  
   # Output adjacency matrix
   output$adjMatrix <- renderTable({
     req(results())
@@ -408,7 +360,6 @@ server <- function(input, output, session) {
       visLayout(randomSeed = 42)
   })
   
-   
   output$degreeDistPlot <- renderPlotly({
     req(results())
     g <- results()$graph
