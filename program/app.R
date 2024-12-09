@@ -143,7 +143,7 @@ server <- function(input, output, session) {
         local_clustering_coefficient = transitivity(g, type = "local", isolates = "zero")
       ) %>% 
         mutate(across(where(is.numeric), ~round(., 4)))
-      
+     
       # Adjacency Matrix
       adjacency <- as.matrix(as_adjacency_matrix(g, sparse = FALSE))
       
