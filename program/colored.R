@@ -160,16 +160,18 @@ server <- function(input, output, session) {
       
       # Adjacency Matrix
       adjacency <- as.matrix(as_adjacency_matrix(g, sparse = FALSE))
+      
       # Community Detection
       community_det <- cluster_walktrap(g)
       membership <- communities(community_det)
       
+      # Community Metrics
       community_metrics <- data.frame(
         Community_ID = seq_along(membership),
         Members = sapply(membership, function(nodes) paste(nodes, collapse = ", ")),
         Node_Count = sapply(membership, length)
       )
-
+      
       # Additional graph metrics
       list(
         graph = g,
@@ -184,7 +186,7 @@ server <- function(input, output, session) {
         edges = ecount(g),
         adjacency_matrix = adjacency,
         community_metrics = community_metrics,
-        membership = membership
+        membership = membership  # Store the community membership here
       )
     }
     
@@ -268,29 +270,63 @@ server <- function(input, output, session) {
     results()$community_metrics
   })
   
-  # Community Detection Plot
-output$communityPlot <- renderPlotly({
-  req(results())
+  # Community Metrics Plot
+  output$communityPlot <- renderPlotly({
+    req(results())
+    
+    membership <- results()$membership  # Access precomputed membership
+    
+    # Create a data frame for the bar plot
+    community_metrics <- data.frame(
+      Community_ID = seq_along(membership),
+      Node_Count = sapply(membership, length)
+    )
+    
+    # Create a bar plot
+    plot_ly(community_metrics, x = ~Community_ID, y = ~Node_Count, 
+            type = 'bar', name = 'Nodes',
+            marker = list(color = 'blue', opacity = 0.7)) %>%
+      layout(title = 'Community Size Distribution',
+             xaxis = list(title = 'Community ID'),
+             yaxis = list(title = 'Number of Nodes'),
+             barmode = 'group',
+             height = 300,  # Set the height
+             width = 600)   # Set the width
+  })
   
-  membership <- results()$membership
-  # Create a data frame for the bar plot
-  community_metrics <- data.frame(
-    Community_ID = seq_along(membership),
-    Node_Count = results()$community_metrics$Node_Count
-  )
-  
-  # Create a smaller bar plot
-  plot_ly(community_metrics, x = ~Community_ID, y = ~Node_Count, 
-          type = 'bar', name = 'Nodes',
-          marker = list(color = 'blue', opacity = 0.7)) %>%
-    layout(title = 'Community Size Distribution',
-           xaxis = list(title = 'Community ID'),
-           yaxis = list(title = 'Number of Nodes'),
-           barmode = 'group',
-           height = 300,  # Set the height
-           width = 600)   # Set the width
-})
-
+  # Network Visualization
+  output$network <- renderVisNetwork({
+    req(results())
+    
+    g <- results()$graph
+    membership <- results()$membership  # Access precomputed membership
+    
+    # Convert membership (list of communities) into a numeric vector representing community IDs for each node
+    membership_numeric <- unlist(lapply(seq_along(membership), function(i) rep(i, length(membership[[i]]))))
+    
+    # Generate distinct colors for each community
+    community_colors <- rainbow(length(unique(membership_numeric)))
+    
+    # Assign community colors and groups to nodes
+    nodes <- data.frame(
+      id = V(g)$name,  # Node IDs
+      label = V(g)$name,  # Labels for display
+      group = membership_numeric,  # Community ID as group
+      color = community_colors[membership_numeric]  # Assign color based on community
+    )
+    
+    # Prepare edges for visNetwork
+    edges_vis <- data.frame(
+      from = as.character(ends(g, E(g))[, 1]),
+      to = as.character(ends(g, E(g))[, 2])
+    )
+    
+    # Create the visNetwork plot
+    visNetwork(nodes, edges_vis) %>%
+      visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+      visEdges(smooth = TRUE) %>%
+      visLayout(randomSeed = 42)
+  })
   
   # Download Community Metrics
   output$downloadCommunities <- downloadHandler(
@@ -409,38 +445,47 @@ output$communityPlot <- renderPlotly({
     results()$adjacency_matrix
   }, rownames = TRUE)
   
-  # Network visualization
-  output$network <- renderVisNetwork({
-    req(results())
-    g <- results()$graph
-    
-    # Prepare nodes for visNetwork
-    nodes <- data.frame(
-      id = V(g)$name, 
-      label = V(g)$name,
-      color = "blue"   # Color nodes based on PageRank
-    )
-    
-    # Prepare edges for visNetwork
-    edges_vis <- data.frame(
-      from = as.character(ends(g, E(g))[, 1]),
-      to = as.character(ends(g, E(g))[, 2])
-    )
-    
-    # Create the visNetwork plot
-    visNetwork(nodes, edges_vis) %>%
-      visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
-      visEdges(smooth = TRUE) %>%
-      visLayout(randomSeed = 42)
-  })
-  
-  
+  # output$network <- renderVisNetwork({
+  #   req(results())
+  #   g <- results()$graph
+  #   
+  #   # Perform community detection using Walktrap algorithm
+  #   community_det <- cluster_walktrap(g)
+  #   
+  #   # Convert membership to a named vector
+  #   membership <- as.numeric(membership(community_det))
+  #   
+  #   # Generate distinct colors for each community
+  #   community_colors <- rainbow(length(unique(membership)))
+  #   
+  #   # Assign community colors and groups to nodes
+  #   nodes <- data.frame(
+  #     id = V(g)$name,  # Node IDs
+  #     label = V(g)$name,  # Labels for display
+  #     group = membership,  # Community ID as group
+  #     color = community_colors[membership]  # Assign color based on community
+  #   )
+  #   
+  #   # Prepare edges for visNetwork
+  #   edges_vis <- data.frame(
+  #     from = as.character(ends(g, E(g))[, 1]),
+  #     to = as.character(ends(g, E(g))[, 2])
+  #   )
+  #   
+  #   # Create the visNetwork plot
+  #   visNetwork(nodes, edges_vis) %>%
+  #     visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  #     visEdges(smooth = TRUE) %>%
+  #     visLayout(randomSeed = 42)
+  # })
+  # 
+  # 
   output$degreeDistPlot <- renderPlotly({
     req(results())
     g <- results()$graph
     
     # Get the degrees of the nodes
-    degrees <- results()$centrality_metrics$degree_centrality
+    degrees <- degree(g, mode = "all", normalized = input$normalized)
     
     # Create a data frame with degrees
     degree_data <- data.frame(degree = degrees)
