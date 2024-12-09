@@ -1,112 +1,3 @@
-# # List of required packages
-# packages <- c(
-#   "shiny",
-#   "shinycssloaders",
-#   "igraph",
-#   "tidyverse",
-#   "ggplot2",
-#   "reshape2",
-#   "rgl",
-#   "plotly",
-#   "ff",
-#   "dplyr",
-#   "visNetwork",
-#   "webshot",
-#   "linkcomm"
-# )
-# # Loop to install packages if they are not already installed
-# 
-# for (package in packages) {
-#   if (!require(package, character.only = TRUE)) {
-#     install.packages(package, dependencies = TRUE)
-# 
-#     # Load the package after installation
-# 
-#     library(package, character.only = TRUE)
-#   }
-# }
-
-# 
-# webshot::install_phantomjs()
-
-
-# Increase file upload size to 50 MB
-options(shiny.maxRequestSize = 50 * 1024^2)
-
-# UI definition
-ui <- fluidPage(
-  titlePanel("Advanced Network Analysis Tool"),
-  sidebarLayout(
-    sidebarPanel(
-      fileInput("files", "Upload CSV Files", 
-                multiple = TRUE, 
-                accept = c(".csv")),
-      radioButtons("graphType", "Graph Type:", 
-                   choices = c("Undirected" = "undirected", 
-                               "Directed" = "directed"), 
-                   selected = "undirected"),
-      radioButtons("normalized", "Normalized Results:", 
-                   choices = c("Yes" = TRUE, 
-                               "No" = FALSE), 
-                   selected = FALSE),
-      actionButton("process", "Calculate Metrics")
-    ),
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Graph Info", 
-                 br(),
-                 withSpinner(textOutput("nodesCount"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("edgesCount"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("connected"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("minDegree"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("avgDegree"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("maxDegree"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("diameter"), type = 7, color = "#0d6efd"),
-                 br(),
-                 withSpinner(textOutput("clustering"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Network Visualization", 
-                 downloadButton("downloadNetwork", "Download Network Image", style = "margin: 15px 0;"),
-                 withSpinner(visNetworkOutput("network"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Centrality Metrics",
-                 downloadButton("downloadCentrality", "Download Centrality Metrics", style = "margin: 15px 0;"),
-                 withSpinner(tableOutput("centralityMetrics"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Adjacency Matrix",
-                 br(),
-                 withSpinner(tableOutput("adjMatrix"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Degree Distribution",
-                 withSpinner(plotlyOutput("degreeDistPlot"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Community Detection",
-                 downloadButton("downloadCommunities", "Download Community Metrics", style = "margin: 15px 0;"),
-                 withSpinner(tableOutput("communityDetectionTable"), type = 7, color = "#0d6efd"),
-                 withSpinner(plotlyOutput("communityPlot"), type = 7, color = "#0d6efd")
-        ),
-        tabPanel("Path Analysis",
-                 uiOutput("nodeSelectorPath"),
-                 actionButton("calculatePath", "Calculate Path Between Nodes"),
-                 textOutput("pathResult"),
-                 tableOutput("pathDetails")
-        ),
-        tabPanel("Node Metrics",
-                 uiOutput("nodeSelector"),
-                 actionButton("calculateNodeMetrics", "Calculate Node Metrics"),
-                 tableOutput("nodeMetricsTable")
-        )
-      )
-    )
-  )
-)
-
 # Server definition
 server <- function(input, output, session) {
   
@@ -171,14 +62,16 @@ server <- function(input, output, session) {
         edges = ecount(g),
         adjacency_matrix = adjacency,
         community_metrics = community_metrics,
-        link_communities = lc
+        link_communities = lc,
+        page_rank_values = page_rank(g)$vector,   # Store the page rank values
+        eigenvector_values = eigen_centrality(g)$vector  # Store eigenvector centrality values
       )
     }
     
     # Perform calculations
     results(calculate_metrics(edges(), input$graphType, input$normalized))
     
-    #  loading message
+    # loading message
     removeModal()
     
     # Update node selector for path analysis
@@ -281,48 +174,6 @@ server <- function(input, output, session) {
     }
   )
   
-  # Function for calculating metrics for a specific node
-  calculate_node_metrics <- function(node_name) {
-    # Get the graph from results
-    g <- results()$graph
-    
-    # Find the node index from node name
-    node <- match(node_name, V(g)$name)
-
-    node_metrics <- results()$centrality_metrics[node, ]
-    
-    # Get the neighbors of the node
-    neighbors <- neighbors(g, node)
-    
-    # Retrieve the names of the neighbors
-    neighbor_names <- V(g)[neighbors]$name
-    
-    node_metrics$neighbors <- paste(neighbor_names, collapse = ", ")
-    
-    return(node_metrics)
-  }
-  
-  
-  # Calculate node metrics when button is clicked
-  observeEvent(input$calculateNodeMetrics, {
-    req(input$nodeIndex)
-    node_metrics <- calculate_node_metrics(input$nodeIndex)
-    
-    output$nodeMetricsTable <- renderTable({
-      
-      node_metrics
-      
-    })
-  })
-  
-  
-  
-  # Output the metrics table
-  output$metricsTable <- renderTable({
-    req(results())
-    results()$metrics
-  })
-  
   # Output graph info
   output$nodesCount <- renderText({
     req(results())
@@ -334,7 +185,7 @@ server <- function(input, output, session) {
     paste("Graph Edges Number:", results()$edges)
   })
   
-  # Output the min degree
+  # Output the connected status
   output$connected <- renderText({
     req(results())
     paste("Connected:", results()$connected)
@@ -368,15 +219,6 @@ server <- function(input, output, session) {
     paste("Average Clustering Coefficient:", round(results()$avg_clustering, 3))
   })
   
-  # Enable download of metrics
-  output$downloadMetrics <- downloadHandler(
-    filename = function() { "graph_metrics.csv" },
-    content = function(file) {
-      req(results())
-      write.csv(results()$metrics, file, row.names = FALSE)
-    }
-  )
-  
   # Output adjacency matrix
   output$adjMatrix <- renderTable({
     req(results())
@@ -408,7 +250,6 @@ server <- function(input, output, session) {
       visLayout(randomSeed = 42)
   })
   
-   
   output$degreeDistPlot <- renderPlotly({
     req(results())
     g <- results()$graph
